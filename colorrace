@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>컬러 & 워드 그리드 플래너</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --pink: #e492a4;
+            --blue: #84a6db;
+            --purple: #a676f5;
+            --border-orange: #f5a97f;
+            --bg-skyblue: #f0faff; /* 아이들이 좋아하는 연한 하늘색 배경 */
+            --error-red: #ef4444;
+            --dark-gray: #4b5563;
+        }
+
+        body {
+            /* 배경만 아이들이 좋아하도록 구름 패턴 적용 */
+            background-color: var(--bg-skyblue);
+            background-image: radial-gradient(#ffffff 20%, transparent 20%),
+                              radial-gradient(#ffffff 20%, transparent 20%);
+            background-position: 0 0, 50px 50px;
+            background-size: 100px 100px;
+            
+            font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            overflow-x: hidden;
+            outline: none;
+        }
+
+        .main-wrapper {
+            width: 100%;
+            max-width: 1100px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            position: relative;
+        }
+
+        .header-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            width: 100%;
+            min-height: 80px;
+            margin-bottom: 10px;
+        }
+
+        .round-display {
+            color: var(--border-orange);
+            font-size: 2.5rem;
+            font-weight: 900;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            text-shadow: 2px 2px 0px white, 4px 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .best-record-display {
+            font-size: 1.1rem;
+            color: #666;
+            font-weight: 600;
+            margin-top: 5px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 2px 12px;
+            border-radius: 10px;
+        }
+
+        .action-btn {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background-color: white;
+            border: 2px solid var(--border-orange);
+            color: var(--border-orange);
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 2px 2px 0px var(--border-orange);
+            z-index: 20;
+        }
+
+        .action-btn.visible {
+            display: flex;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        .grid-container {
+            position: relative;
+            width: 100%;
+        }
+
+        .grid-table {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 10px;
+            background-color: var(--border-orange);
+            border: 10px solid var(--border-orange);
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            border-radius: 20px;
+            overflow: hidden;
+            box-sizing: border-box;
+            box-shadow: 0 10px 30px rgba(245, 169, 127, 0.3);
+        }
+
+        .cell {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-weight: 800;
+            font-size: clamp(0.9rem, 3.5vw, 2.2rem); 
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.2);
+            text-align: center;
+            padding: 10px;
+            user-select: none;
+            letter-spacing: -0.02em;
+            white-space: nowrap;
+            line-height: 1.2;
+            transition: background-color 0.5s ease;
+        }
+
+        .cell-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #1a1a1a;
+            z-index: 5;
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+
+        .cell-overlay.revealed {
+            opacity: 0;
+            pointer-events: none;
+            transform: scale(1.1);
+        }
+
+        /* 공통 모달 스타일 */
+        .modal-base {
+            position: fixed;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 40px 60px;
+            border-radius: 32px;
+            z-index: 100;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            min-width: 450px;
+            max-width: 90vw;
+        }
+
+        #timeResultModal {
+            top: 28%; 
+            box-shadow: 0 30px 80px rgba(0,0,0,0.25), 0 0 0 6px var(--border-orange);
+            gap: 20px;
+        }
+
+        #finalReportModal {
+            top: 15%;
+            box-shadow: 0 30px 100px rgba(0,0,0,0.3), 0 0 0 8px var(--dark-gray);
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        .modal-base.active {
+            display: flex;
+            animation: modalPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        #timeResultModal.fail {
+            box-shadow: 0 30px 80px rgba(239, 68, 68, 0.2), 0 0 0 6px var(--error-red);
+        }
+
+        @keyframes modalPop {
+            0% { transform: translateX(-50%) scale(0.8); opacity: 0; }
+            100% { transform: translateX(-50%) scale(1); opacity: 1; }
+        }
+
+        .modal-title {
+            font-size: 1.6rem;
+            color: #666;
+            font-weight: 700;
+        }
+
+        .modal-time {
+            font-size: 4.5rem;
+            font-weight: 950;
+            color: var(--border-orange);
+            line-height: 1.1;
+            margin: 5px 0;
+            white-space: nowrap;
+        }
+
+        .modal-message {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #4b5563;
+            margin-bottom: 10px;
+        }
+
+        .modal-message.fail {
+            color: var(--error-red);
+        }
+
+        /* 결과 리포트 테이블 스타일 */
+        .history-table {
+            width: 100%;
+            margin: 20px 0;
+            border-collapse: collapse;
+        }
+
+        .history-table th {
+            padding: 12px;
+            border-bottom: 2px solid #eee;
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        .history-table td {
+            padding: 15px;
+            border-bottom: 1px solid #f5f5f5;
+            font-weight: 700;
+            color: var(--dark-gray);
+            font-size: 1.2rem;
+        }
+
+        .history-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .modal-button-group {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+            justify-content: center;
+            margin-top: 10px;
+        }
+
+        .modal-btn {
+            padding: 16px 36px;
+            border-radius: 16px;
+            font-size: 1.2rem;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            box-shadow: 0 4px 0px rgba(0,0,0,0.05);
+        }
+
+        .btn-exit {
+            background-color: #f3f4f6;
+            color: var(--dark-gray);
+        }
+
+        .btn-next {
+            background-color: var(--border-orange);
+            color: white;
+        }
+
+        .btn-retry {
+            background-color: var(--error-red);
+            color: white;
+        }
+
+        .modal-btn:hover {
+            transform: translateY(-3px);
+            filter: brightness(0.98);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+        }
+
+        .modal-btn:active {
+            transform: translateY(1px);
+        }
+
+        .hint-text {
+            text-align: center;
+            color: #666;
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-top: 10px;
+            background: rgba(255, 255, 255, 0.5);
+            padding: 4px 15px;
+            border-radius: 20px;
+            display: inline-block;
+            align-self: center;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+    </style>
+</head>
+<body tabindex="0">
+
+    <div class="main-wrapper">
+        <div class="header-container">
+            <div class="round-display" id="roundDisplay">ROUND 1</div>
+            <div class="best-record-display" id="bestRecordDisplay">이전 기록: 없음</div>
+        </div>
+
+        <div class="grid-container">
+            <div class="grid-table" id="colorGrid">
+                <!-- JavaScript로 셀 생성 -->
+            </div>
+            
+            <button class="action-btn" id="refreshBtn" onclick="handleNextStep()" title="다음 라운드">
+                <svg id="refreshIcon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                    <polyline points="12 5 19 12 12 19"></polyline>
+                </svg>
+            </button>
+        </div>
+        
+        <p class="hint-text">스페이스바를 눌러 셀을 하나씩 공개하세요</p>
+    </div>
+
+    <!-- 라운드 결과 모달 -->
+    <div id="timeResultModal" class="modal-base">
+        <div class="modal-title">이번 라운드 기록</div>
+        <div class="modal-time" id="finalTimeDisplay">00.00초</div>
+        <div class="modal-message" id="modalMessage">기록 단축 성공!</div>
+        <div class="modal-button-group" id="modalButtonGroup">
+            <!-- 상황에 따라 버튼이 동적으로 생성됨 -->
+        </div>
+    </div>
+
+    <!-- 최종 성적 리포트 모달 (Class Record) -->
+    <div id="finalReportModal" class="modal-base">
+        <div class="modal-title" style="color: var(--dark-gray); font-size: 2.2rem; letter-spacing: 1px;">Class Record</div>
+        <table class="history-table">
+            <thead>
+                <tr>
+                    <th>라운드</th>
+                    <th>소요 시간</th>
+                </tr>
+            </thead>
+            <tbody id="historyBody">
+                <!-- 기록 데이터가 삽입됨 -->
+            </tbody>
+        </table>
+        <div class="modal-button-group">
+            <div class="modal-btn btn-next" onclick="resetAndStartOver()" style="width: 100%;">처음부터 다시 시작</div>
+        </div>
+    </div>
+
+    <script>
+        const colorPalette = ['#e492a4', '#84a6db', '#a676f5'];
+        const words = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        
+        const grid = document.getElementById('colorGrid');
+        const roundDisplay = document.getElementById('roundDisplay');
+        const bestRecordDisplay = document.getElementById('bestRecordDisplay');
+        const refreshBtn = document.getElementById('refreshBtn');
+        const timeModal = document.getElementById('timeResultModal');
+        const reportModal = document.getElementById('finalReportModal');
+        const finalTimeDisplay = document.getElementById('finalTimeDisplay');
+        const modalMessage = document.getElementById('modalMessage');
+        const modalButtonGroup = document.getElementById('modalButtonGroup');
+        const historyBody = document.getElementById('historyBody');
+        
+        const cellCount = 16; 
+        let currentRound = 1;
+        let revealedIndex = -1;
+        let lastRecordSeconds = null; 
+        let roundHistory = []; 
+        
+        let startTime = null;
+        let isTimerRunning = false;
+        let isSuccess = false;
+
+        function getBalancedColors() {
+            let result = [];
+            const countPerColor = Math.floor(cellCount / colorPalette.length); 
+            colorPalette.forEach((color, index) => {
+                let targetCount = (index === colorPalette.length - 1) ? (cellCount - result.length) : countPerColor;
+                for (let i = 0; i < targetCount; i++) result.push(color);
+            });
+            for (let i = result.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [result[i], result[j]] = [result[j], result[i]];
+            }
+            return result;
+        }
+
+        function getRandomWords() {
+            let selected = [];
+            let tempWords = [...words];
+            for (let i = 0; i < cellCount; i++) {
+                if (tempWords.length === 0) tempWords = [...words];
+                selected.push(tempWords.splice(Math.floor(Math.random() * tempWords.length), 1)[0]);
+            }
+            return selected;
+        }
+
+        function initGrid(resetRound = false) {
+            grid.innerHTML = '';
+            revealedIndex = -1;
+            refreshBtn.classList.remove('visible'); 
+            timeModal.classList.remove('active');
+            reportModal.classList.remove('active');
+            timeModal.classList.remove('fail');
+            
+            if (resetRound) {
+                currentRound = 1;
+                lastRecordSeconds = null;
+                roundHistory = [];
+                roundDisplay.textContent = `ROUND 1`;
+                bestRecordDisplay.textContent = `이전 기록: 없음`;
+            }
+
+            startTime = Date.now();
+            isTimerRunning = true;
+
+            const balancedColors = getBalancedColors();
+            const selectedWords = getRandomWords();
+            
+            for (let i = 0; i < cellCount; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.style.backgroundColor = balancedColors[i];
+                cell.textContent = selectedWords[i];
+                
+                const overlay = document.createElement('div');
+                overlay.className = 'cell-overlay';
+                overlay.id = `overlay-${i}`;
+                cell.appendChild(overlay);
+                grid.appendChild(cell);
+            }
+        }
+
+        function handleNextStep() {
+            if (isSuccess) {
+                currentRound++;
+                roundDisplay.textContent = `ROUND ${currentRound}`;
+                bestRecordDisplay.textContent = `이전 기록: ${formatDuration(lastRecordSeconds)}`;
+                initGrid();
+            } else {
+                initGrid();
+            }
+        }
+
+        function exitGame() {
+            timeModal.classList.remove('active');
+            historyBody.innerHTML = '';
+            if (roundHistory.length === 0) {
+                historyBody.innerHTML = '<tr><td colspan="2" style="color:#aaa; font-weight:400; font-size:1rem;">기록이 없습니다.</td></tr>';
+            } else {
+                roundHistory.forEach((record) => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>ROUND ${record.round}</td>
+                        <td style="color: var(--border-orange);">${formatDuration(record.time)}</td>
+                    `;
+                    historyBody.appendChild(row);
+                });
+            }
+            reportModal.classList.add('active');
+        }
+
+        function resetAndStartOver() {
+            initGrid(true);
+        }
+
+        function formatDuration(seconds) {
+            if (seconds === null) return "없음";
+            if (seconds >= 60) {
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = (seconds % 60).toFixed(2);
+                return `${minutes}분 ${remainingSeconds}초`;
+            } else {
+                return `${seconds.toFixed(2)}초`;
+            }
+        }
+
+        function showResult(durationSeconds) {
+            finalTimeDisplay.textContent = formatDuration(durationSeconds);
+            modalButtonGroup.innerHTML = '';
+            
+            if (lastRecordSeconds === null || durationSeconds < lastRecordSeconds) {
+                isSuccess = true;
+                roundHistory.push({ round: currentRound, time: durationSeconds });
+                lastRecordSeconds = durationSeconds;
+                modalMessage.textContent = currentRound === 1 ? "첫 라운드 완료!" : "기록 단축 성공! 다음 단계로 도전하세요.";
+                modalMessage.className = "modal-message";
+                timeModal.classList.remove('fail');
+
+                modalButtonGroup.innerHTML = `
+                    <div class="modal-btn btn-exit" onclick="exitGame()">종료하기</div>
+                    <div class="modal-btn btn-next" onclick="handleNextStep()">다음 라운드</div>
+                `;
+                refreshBtn.classList.add('visible');
+            } else {
+                isSuccess = false;
+                modalMessage.textContent = `기록 단축 실패... (${formatDuration(lastRecordSeconds)}보다 빨라야 함)`;
+                modalMessage.className = "modal-message fail";
+                timeModal.classList.add('fail');
+
+                modalButtonGroup.innerHTML = `
+                    <div class="modal-btn btn-exit" onclick="exitGame()">종료하기</div>
+                    <div class="modal-btn btn-retry" onclick="handleNextStep()">다시 시도</div>
+                `;
+                refreshBtn.classList.remove('visible');
+            }
+            timeModal.classList.add('active');
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (timeModal.classList.contains('active') || reportModal.classList.contains('active')) return;
+
+                if (revealedIndex < cellCount - 1) {
+                    revealedIndex++;
+                    const targetOverlay = document.getElementById(`overlay-${revealedIndex}`);
+                    if (targetOverlay) targetOverlay.classList.add('revealed');
+                    
+                    if (revealedIndex === cellCount - 1 && isTimerRunning) {
+                        const endTime = Date.now();
+                        const durationInSeconds = (endTime - startTime) / 1000;
+                        isTimerRunning = false;
+                        showResult(durationInSeconds);
+                    }
+                }
+            }
+        });
+
+        window.onload = () => initGrid(true);
+    </script>
+</body>
+</html>
